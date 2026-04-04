@@ -1,0 +1,9 @@
+You will read a compact score excerpt. 
+
+Legend: w/h/q/e/s/32… = note lengths; . = dot; rest<rh>; pitch+octave; C4+E4 = chord; ^a:b = tuplet; g: grace; ~ tie; +st/+acc… = articulations; N.Nql = length in quarter-notes.
+
+Write ONE line of tags only (no prose, no title). Style: telegraphic; semicolon-separated; 5–8 tags total; each tag ≤4 words; drop articles where possible. No full sentences.
+
+Use concrete tags (rhythm, harmony or key when clear, who plays what and how). When something in the window is especially characteristic or ear-catching, make sure it appears among the tags; otherwise spread attention across what matters. Melodic contour (up/down, chromatic) is fine when it clearly matches the excerpt; otherwise lean on rhythm, color, and ensemble. Prefer specific description over vague, generic characteristics. 
+Excerpt:
+{}
