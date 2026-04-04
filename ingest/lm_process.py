@@ -181,7 +181,7 @@ def window_to_text(src: stream.Score, start_idx: int, size: int,
         if ch:
             return "(all parts rest)"
         return "(empty window)"
-    print(lines)
+    # print(lines)
     return "\n".join(lines)
 
 
