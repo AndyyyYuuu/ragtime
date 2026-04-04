@@ -4,3 +4,4 @@ ipykernel
 music21
 pandas
 tqdm
+anthropic

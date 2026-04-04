@@ -207,13 +207,11 @@ def save_instrument_docs(df: pd.DataFrame, file_path: str) -> None:
 
 # parse_and_pickle(FILE_PATH + ".xml")
 
-
-# score = pickle.load(open(FILE_PATH + ".pickle", "rb"))
-# print(f"Loaded {score}")
-# df = medium_convert(score, head_length=150)
-# df.to_csv(FILE_PATH + ".csv", index=False)
-# save_instrument_docs(df, FILE_PATH + ".xml")
-
-
-df = pd.read_csv(FILE_PATH + ".csv")
-save_instrument_docs(df, FILE_PATH)
+if __name__ == "__main__":
+    # score = pickle.load(open(FILE_PATH + ".pickle", "rb"))
+    # print(f"Loaded {score}")
+    # df = medium_convert(score, head_length=150)
+    # df.to_csv(FILE_PATH + ".csv", index=False)
+    # save_instrument_docs(df, FILE_PATH + ".xml")
+    df = pd.read_csv(FILE_PATH + ".csv")
+    save_instrument_docs(df, FILE_PATH)
