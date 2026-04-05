@@ -14,6 +14,7 @@ def chat(message, history):
     print("\n\nRetrievals:\n", call["retrievals"])
     return call["answer"]
 
+examples = [line.strip().split("#")[0].strip() for line in open("examples.txt").readlines() if line.strip() != ""]
 
-demo = gr.ChatInterface(fn=chat, examples=["Find a crescendo in Holst's The Planets.", "Describe "], title="Music Score Retrieval")
-demo.launch()
+demo = gr.ChatInterface(fn=chat, examples=examples, title="Demo: Retrieval for Holst's The Planets")
+demo.launch(share=False)

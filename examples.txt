@@ -1,0 +1,2 @@
+When does entire orchestra play the same rhythm in The Planets? # bars 110 - 112 is the most obvious example
+Find a crescendo in Holst's The Planets. # Stress test case: the agent does not have access to "wedge" crescendos
