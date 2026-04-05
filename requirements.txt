@@ -5,3 +5,4 @@ music21
 pandas
 tqdm
 anthropic
+gradio
