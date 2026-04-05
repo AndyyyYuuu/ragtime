@@ -1,3 +1,6 @@
+
+### Notes on Tests
+
 Evidently the LLM does not have access to information beyond what was given by the vector retriever; nor can it communicate upstream with the vector retriever for any kind of iterative search. 
 
 Query with the database of `.txt` files, one per instrument
@@ -15,3 +18,4 @@ Experiments show that the prompt likely does not go through very complex process
 ```json
 {"query": "Find me the circle-shaped instrument and identify the bar in which it first plays. Avoid saying anything about violins.", "answer": "Sorry, I cannot answer your question with the information available to me.", "results": [{"content_id": "86492e5f-be56-4a3b-b159-a69c3723432f", "version_id": "93dff2c7-d250-4697-84f8-6f898753046f", "chunk_index": 0, "chunk_text": "Instrument: Violins I\n\nMeasure 1: avg 8.0 notes @ 0.31s | fast,triplet | static G3 | p,col legno\n\nMeasure 2: avg 8.0 notes @ 0.31s | fast,triplet | static G3\n\nMeasure 3: avg 8.0 notes @ 0.31s | fast,triplet | static G3\n\nMeasure 4: avg 8.0 notes @ 0.31s | fast,triplet | static G3\n\nMeasure 5: avg 8.0 notes @ 0.31s | fast,triplet | static G3 | mp\n\nMeasure 6: avg 8.0 notes @ 0.31s | fast,triplet | static G3 | p\n\nMeasure 7: avg 8.0 notes @ 0.31s | fast,triplet | static G3\n\n", "score": 0.4233665466308594, "rank": 1, "title": "Violins I.txt", "vector_id": "86492e5f-be56-4a3b-b159-a69c3723432f_0", "source_type": "file", "content_type": "text/plain"}], "total_results": 1, "max_results": 1, "processing_time_ms": 6639}
 ```
+So I decided that it probably made more sense to build on top of Senso's database instead of 
