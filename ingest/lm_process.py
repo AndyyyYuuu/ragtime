@@ -5,7 +5,6 @@ import dotenv
 import pickle
 from tqdm import tqdm
 from process_features import parse_and_pickle
-from process_features import parse_and_pickle
 
 dotenv.load_dotenv()
 
@@ -145,38 +144,70 @@ def _event_token(el: note.GeneralNote) -> str | None:
     return None
 
 
+def _dynamic_token(d: dynamics.Dynamic) -> str | None:
+    if getattr(d.style, "hideObjectOnPrint", False):
+        return None
+    v = (getattr(d, "value", None) or "").strip()
+    if not v:
+        return None
+    return f"dyn:{v}"
+
+
 def _rest_only_events(events: list[str]) -> bool:
     return all(e.removeprefix("g:").startswith("rest") for e in events)
 
 
-def window_to_text(src: stream.Score, start_idx: int, size: int,
-                   omit_per_part_rests: bool = True) -> str:
+def window_to_text(src: stream.Score, start_idx: int, size: int, omit_rests: bool = True, 
+                   measure_lists: list[list] | None = None) -> str:
+    if measure_lists is None:
+        measure_lists = [list(part.getElementsByClass(stream.Measure)) for part in src.parts]
     lines: list[str] = []
-    for part in src.parts:
+    for part, ms in zip(src.parts, measure_lists):
         pname = (part.partName or getattr(part, "id", None) or "part").strip()
-        ms = list(part.getElementsByClass(stream.Measure))
         chunk = ms[start_idx : start_idx + size]
         for m in chunk:
             flat = m.flatten()
-            events: list[str] = []
-            for el in sorted(
-                flat.notesAndRests,
-                key=lambda x: (float(x.offset or 0.0), getattr(x, "sortOrderWithinOffset", 0)),
-            ):
+            items: list[tuple[float, int, str]] = []
+            for el in flat.notesAndRests:
                 tok = _event_token(el)
                 if tok is not None:
-                    events.append(tok)
+                    items.append(
+                        (
+                            float(el.offset or 0.0),
+                            int(getattr(el, "sortOrderWithinOffset", 0) or 0),
+                            tok,
+                        )
+                    )
+            seen_dyn: set[tuple[float, str]] = set()
+            for d in flat.getElementsByClass(dynamics.Dynamic):
+                tok = _dynamic_token(d)
+                if tok is None:
+                    continue
+                off = float(d.offset or 0.0)
+                key = (off, tok)
+                if key in seen_dyn:
+                    continue
+                seen_dyn.add(key)
+                items.append(
+                    (
+                        off,
+                        int(getattr(d, "sortOrderWithinOffset", 0) or 0),
+                        tok,
+                    )
+                )
+            items.sort(key=lambda x: (x[0], x[1]))
+            events = [t for _, _, t in items]
             if not events:
                 line = f"{pname}: rest"
-                if omit_per_part_rests:
+                if omit_rests:
                     continue
-            elif omit_per_part_rests and _rest_only_events(events):
+            elif omit_rests and _rest_only_events(events):
                 continue
             else:
                 line = f"{pname}: {' '.join(events)}"
             lines.append(line)
     if not lines:
-        ms0 = list(src.parts[0].getElementsByClass(stream.Measure))
+        ms0 = measure_lists[0]
         ch = ms0[start_idx : start_idx + size]
         if ch:
             return "(all parts rest)"
@@ -185,19 +216,19 @@ def window_to_text(src: stream.Score, start_idx: int, size: int,
     return "\n".join(lines)
 
 
-def lm_process(path: str, piece: str, window_size: int = 2, start_bar: int = 1, end_bar: int | None = None, 
-               omit_per_part_rests: bool = True) -> None:
+def process_score(path: str, piece: str, lm: bool = False, window_size: int = 2, start_bar: int = 1, end_bar: int | None = None, 
+                  omit_rests: bool = True, suffix: str = None) -> None:
     start_idx = start_bar - 1
     end_idx = None if end_bar is None else end_bar
     # end_idx = end_idx - 1 for conversion to bar index and + 1 for inclusive range
     pickle_path = path + ".pickle"
-    text_path = path + ".lmdesc.txt"
+    text_path = path + (suffix if suffix is not None else (".lmdesc.txt" if lm else ".finedesc.txt"))
     score = pickle.load(open(pickle_path, "rb"))
     if not isinstance(score, stream.Score):
         score = score.toScore()
 
-    part0 = score.parts[0]
-    measures = list(part0.getElementsByClass(stream.Measure))
+    measure_lists = [list(part.getElementsByClass(stream.Measure)) for part in score.parts]
+    measures = measure_lists[0] # sample 1 part only used for indexing
 
     assert len(measures) >= 1
     assert window_size >= 1
@@ -215,11 +246,16 @@ def lm_process(path: str, piece: str, window_size: int = 2, start_bar: int = 1, 
     for i in tqdm(range(start_idx, end_idx)):
         actual_size = min(window_size, len(measures) - i)
         start_num = measures[i].number
-        excerpt = window_to_text(score, i, actual_size, omit_per_part_rests=omit_per_part_rests)
-        description = get_description(excerpt)
+        excerpt = window_to_text(score, i, actual_size, omit_rests=omit_rests, measure_lists=measure_lists)
+        if lm:
+            body = get_description(excerpt)
+        else:
+            body = excerpt.replace("\n", " / ")
         with open(text_path, "a") as f:
-            f.write(f"{piece} [{start_num}]: {description}\n")
+            f.write(f"{piece} [{start_num}]: {body}\n")
 
 
 if __name__ == "__main__":
-    lm_process(FILE_PATH, "planets", window_size=2, end_bar=185)
+    # Mars: bars 1 - 185
+    # process_score(FILE_PATH, "planets", lm=False, window_size=1, end_bar=185)
+    process_score(FILE_PATH, "planets", lm=True, window_size=1, start_bar=32)

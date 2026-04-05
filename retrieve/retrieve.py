@@ -1,10 +1,17 @@
-import os, requests, dotenv, anthropic
+import os
+
+import anthropic
+import dotenv
+import requests
 
 dotenv.load_dotenv()
 
 PIECES = ["planets"]
 
-SENSO_API_KEY = os.environ["SENSO_LMTXT_KEY"]
+PIECE_FINEDESC_PATH = "data/raw_xml/holst-the-planets-op-32.finedesc.txt"
+
+SENSO_LM_KEY = os.environ["SENSO_LMTXT_KEY"]
+SENSO_FINE_KEY = os.environ["SENSO_FINETXT_KEY"]
 ANTHROPIC_API_KEY = os.environ["ANTHROPIC_KEY"]
 
 AGENT_SYSTEM_PROMPT = open("retrieve/system_prompt.txt").read()
@@ -28,13 +35,13 @@ def text_from_assistant_content(content) -> str:
     return "".join(parts)
 
 
-def search(query: str, top_k: int = 3) -> list[str]:
+def search_by_description(query: str, top_k: int = 3) -> list[str]:
     if top_k < 1: 
         raise ValueError("Top k must be greater than 0")
     response = requests.post("https://apiv2.senso.ai/api/v1/org/search/context",
         headers={
             "Content-Type": "application/json",
-            "X-API-Key": SENSO_API_KEY,
+            "X-API-Key": SENSO_LM_KEY,
         },
         json={
             "query": query,
@@ -44,33 +51,57 @@ def search(query: str, top_k: int = 3) -> list[str]:
     )
     return [r["chunk_text"] for r in response.json()["results"]]
 
-
-def retrieve_by_piece_bar(piece: str, bar: int, top_k: int = 1) -> list[str]:
-    if piece not in PIECES:
-        raise ValueError(f"Piece must be one of: {PIECES}")
-    if bar < 1: 
-        raise ValueError("Bar number must be greater than 0")
+def search_by_notes(query: str, top_k: int = 3) -> list[str]:
     if top_k < 1: 
         raise ValueError("Top k must be greater than 0")
     response = requests.post("https://apiv2.senso.ai/api/v1/org/search/context",
         headers={
             "Content-Type": "application/json",
-            "X-API-Key": SENSO_API_KEY,
+            "X-API-Key": SENSO_FINE_KEY,
         },
         json={
-            "query": f"{piece} [{bar}]",
+            "query": query,
             "max_results": top_k,
             "require_scoped_ids": False
         }
     )
-    return [result['chunk_text'] for result in response.json()['results']]
-    # return ' '.join([f"Result {idx+i+1}: {result['chunk_text']}" for i, result in enumerate(response.json()['results'])])
+    return [r["chunk_text"] for r in response.json()["results"]]
+
+def retrieve_by_piece_bar(piece: str, bar: int) -> list[str]:
+    if piece not in PIECES:
+        raise ValueError(f"Piece must be one of: {PIECES}")
+    if bar < 1:
+        raise ValueError("Bar number must be greater than 0")
+    with open(PIECE_FINEDESC_PATH, encoding="utf-8") as f:
+        lines = f.readlines()
+    n = len(lines)
+    if bar > n:
+        raise ValueError(f"Bar {bar} out of range (finedesc has {n} lines)")
+    return [lines[bar - 1].rstrip("\n\r")]
 
 
 tools = [
     {
-        "name": "search",
-        "description": "Retrieve by text matching (simple embedding search)",
+        "name": "search_by_description",
+        "description": "Retrieve by text matching (simple embedding search) with a description of each bar.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "query": {
+                    "type": "string",
+                    "description": "A brief textual search term."
+                },
+                "top_k": {
+                    "type": "integer",
+                    "description": "The number of results to return. Defaults to 3."
+                }
+            },
+            "required": ["query"]
+        }
+    },
+    {
+        "name": "search_by_notes",
+        "description": "Retrieve by text matching (simple embedding search) with the fine-grained notes of each bar.",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -88,7 +119,7 @@ tools = [
     },
     {
         "name": "retrieve_by_bar",
-        "description": "Retrieve by bar number.",
+        "description": "Retrieve notes and some other fine-grained musical details by bar number. ",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -99,10 +130,6 @@ tools = [
                 "bar": {
                     "type": "integer",
                     "description": "The bar number to search for."
-                },
-                "top_k": {
-                    "type": "integer",
-                    "description": "The number of results to return. Defaults to 3."
                 }
             },
             "required": ["piece", "bar"]
@@ -140,14 +167,17 @@ def call_agent(query: str, history: list[dict] = [], max_turns: int = 10) -> dic
             turn_count += 1
             if block.type == "tool_use":
                 tool_name = block.name
-                if tool_name == "search":
+                if tool_name == "search_by_description":
                     query = block.input["query"]
                     # default top 3 defined here
-                    results = search(query, block.input.get("top_k", 3))
+                    results = search_by_description(query, block.input.get("top_k", 3))
+                elif tool_name == "search_by_notes":
+                    query = block.input["query"]
+                    results = search_by_notes(query, block.input.get("top_k", 3))
                 elif tool_name == "retrieve_by_bar":
                     piece = block.input["piece"]
                     bar = block.input["bar"]
-                    results = retrieve_by_piece_bar(piece, bar, block.input.get("top_k", 3))
+                    results = retrieve_by_piece_bar(piece, bar)
                 tool_results.append(
                     {
                         "type": "tool_result",
